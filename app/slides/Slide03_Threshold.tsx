@@ -6,12 +6,14 @@ export default function Slide03_Threshold() {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 600),
-      setTimeout(() => setPhase(2), 2500),
-      setTimeout(() => setPhase(3), 4500),
-    ];
-    return () => timers.forEach(clearTimeout);
+    const t1 = setTimeout(() => setPhase(1), 600);
+    const t2 = setTimeout(() => setPhase(2), 2500);
+    const t3 = setTimeout(() => setPhase(3), 4500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, []);
 
   return (
@@ -22,28 +24,24 @@ export default function Slide03_Threshold() {
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="relative w-full max-w-2xl h-80">
-          {/* Door frame */}
+        <div className="relative w-full max-w-2xl h-72">
           <div className="absolute left-1/2 -translate-x-1/2 top-0 w-40 h-full border-4 border-military-600 bg-military-800/30">
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-xs text-military-500 font-mono">DOOR FRAME</div>
           </div>
 
-          {/* Threshold line */}
           <div className={`absolute left-1/2 -translate-x-1/2 bottom-20 w-48 h-1 bg-accent-red transition-all duration-1000 ${phase >= 1 ? 'opacity-100 shadow-[0_0_20px_rgba(139,38,53,0.6)]' : 'opacity-0'}`}>
             <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-accent-red text-xs font-mono font-bold tracking-widest">THRESHOLD</div>
           </div>
 
-          {/* Operator approaching */}
           <div className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${phase >= 1 ? 'bottom-32' : 'bottom-8'}`}>
             <div className="w-12 h-12 bg-accent-gold rounded-full border-2 border-white flex items-center justify-center shadow-lg">
               <span className="text-military-900 font-bold text-sm">1</span>
             </div>
-            <div className={`mt-2 text-center transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`mt-2 transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
               <p className="text-accent-gold text-xs font-mono">PIE THE DOOR</p>
             </div>
           </div>
 
-          {/* Vision cone - appears during pieing */}
           <div className={`absolute left-1/2 transition-all duration-1000 ${phase >= 2 ? 'opacity-100' : 'opacity-0'}`}>
             <div className="relative -translate-x-1/2 top-24">
               <div className="w-0 h-0 border-l-[80px] border-r-[80px] border-b-[120px] border-l-transparent border-r-transparent border-b-accent-gold/10" />
@@ -51,7 +49,6 @@ export default function Slide03_Threshold() {
             </div>
           </div>
 
-          {/* Hard corner indicators */}
           <div className={`absolute left-8 top-20 transition-all duration-700 ${phase >= 2 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}>
             <div className="w-16 h-16 bg-accent-red/20 border border-accent-red rounded-lg flex items-center justify-center">
               <span className="text-accent-red text-xs font-mono font-bold">HARD<br/>CORNER</span>
@@ -64,7 +61,6 @@ export default function Slide03_Threshold() {
             </div>
           </div>
 
-          {/* Entry burst */}
           <div className={`absolute left-1/2 -translate-x-1/2 bottom-40 transition-all duration-700 ${phase >= 3 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
             <div className="flex gap-1">
               {[0,1,2].map(i => (
@@ -80,7 +76,7 @@ export default function Slide03_Threshold() {
         {[
           { step: '01', title: 'PIE THE DOOR', desc: 'Clear what you can see before crossing. Never enter blind.' },
           { step: '02', title: 'HARD CORNERS', desc: 'Identify corners you cannot clear from outside. Plan your entry.' },
-          { step: '03', title: 'EXPLOIT', desc: 'Cross the threshold fast. The enemy knows you're coming.' },
+          { step: '03', title: 'EXPLOIT', desc: 'Cross the threshold fast. The enemy knows you are coming.' },
         ].map((s, i) => (
           <div key={i} className={`glass-panel p-4 border-l-2 transition-all duration-500 ${phase > i ? 'border-accent-gold' : 'border-military-700'}`}>
             <div className="flex items-center gap-2 mb-2">
