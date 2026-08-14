@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { fetchDiscordUser, fetchDiscordGuilds, syncUserWithDatabase } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { fetchDiscordUser, fetchDiscordGuilds } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { Shield, Loader2 } from 'lucide-react';
 
@@ -29,27 +29,37 @@ export default function AuthCallback() {
 
       setMessage('Fetching Discord profile...');
       const discordUser = await fetchDiscordUser(accessToken);
-      
+
       setMessage('Verifying server membership...');
       const guilds = await fetchDiscordGuilds(accessToken);
       const isInGuild = guilds.some((g: any) => g.id === GUILD_ID);
-      
+
       if (!isInGuild) {
         throw new Error('You must be a member of the GGRP Discord server');
       }
 
-      setMessage('Syncing user data...');
-      await syncUserWithDatabase(discordUser, 'attendee');
-
-      // Tenta login
+      setMessage('Authenticating...');
       const email = `${discordUser.id}@discord.local`;
-      const password = discordUser.id + (discordUser.discriminator || '0');
+      const password = discordUser.id + '-hrk-cqb-2026';
 
-      let signInResult = await supabase.auth.signInWithPassword({ email, password });
+      // Prova login
+      let { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
 
-      // Se il login fallisce, crea l'utente e riprova il login
-      if (signInResult.error) {
-        const { error: signUpError } = await supabase.auth.signUp({
+      if (!authError && authData.user) {
+        // Utente esiste, aggiorna metadati
+        await supabase.auth.updateUser({
+          data: {
+            discord_id: discordUser.id,
+            username: discordUser.username,
+          }
+        });
+      } else {
+        // Crea nuovo utente
+        console.log('Creating new user...');
+        const signUpResult = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -60,20 +70,36 @@ export default function AuthCallback() {
           },
         });
 
-        if (signUpError) throw signUpError;
+        if (signUpResult.error) throw signUpResult.error;
+        authData = signUpResult.data;
+      }
 
-        // Ora fai il login
-        signInResult = await supabase.auth.signInWithPassword({ email, password });
-        if (signInResult.error) throw signInResult.error;
+      const supabaseUser = authData?.user;
+      if (!supabaseUser) throw new Error('Authentication failed - no user');
+
+      // Sync con tabella users (upsert per discord_id)
+      setMessage('Syncing profile...');
+      const { error: upsertError } = await supabase
+        .from('users')
+        .upsert({
+          discord_id: discordUser.id,
+          username: discordUser.username,
+          avatar: discordUser.avatar,
+          role: 'attendee',
+        }, { onConflict: 'discord_id' });
+
+      if (upsertError) {
+        console.error('Profile sync error:', upsertError);
       }
 
       setStatus('success');
-      setMessage('Authentication successful!');
-      
+      setMessage('Welcome, ' + discordUser.username);
+
       setTimeout(() => {
         router.push('/dashboard');
-      }, 1000);
+      }, 500);
     } catch (error: any) {
+      console.error('Auth callback error:', error);
       setStatus('error');
       setMessage(error.message || 'Authentication failed');
     }

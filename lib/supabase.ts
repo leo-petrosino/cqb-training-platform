@@ -31,15 +31,31 @@ export async function signInWithDiscord() {
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return null;
 
-  const { data } = await supabase
+  // Cerca per discord_id dai metadati utente (più affidabile)
+  const discordId = user.user_metadata?.discord_id;
+
+  if (discordId) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('discord_id', discordId.toString())
+      .maybeSingle();
+
+    if (data) return data;
+    if (error) console.error('Error fetching user by discord_id:', error);
+  }
+
+  // Fallback: cerca per id Supabase Auth
+  const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
+  if (error) console.error('Error fetching user by id:', error);
   return data;
 }
 
