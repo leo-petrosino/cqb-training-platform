@@ -29,11 +29,11 @@ export default function AuthCallback() {
 
       setMessage('Fetching Discord profile...');
       const discordUser = await fetchDiscordUser(accessToken);
-
+      
       setMessage('Verifying server membership...');
       const guilds = await fetchDiscordGuilds(accessToken);
       const isInGuild = guilds.some((g: any) => g.id === GUILD_ID);
-
+      
       if (!isInGuild) {
         throw new Error('You must be a member of the GGRP Discord server');
       }
@@ -41,12 +41,38 @@ export default function AuthCallback() {
       setMessage('Syncing user data...');
       await syncUserWithDatabase(discordUser, 'attendee');
 
+      // Tenta login
+      const email = `${discordUser.id}@discord.local`;
+      const password = discordUser.id + (discordUser.discriminator || '0');
+
+      let signInResult = await supabase.auth.signInWithPassword({ email, password });
+
+      // Se il login fallisce, crea l'utente e riprova il login
+      if (signInResult.error) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              discord_id: discordUser.id,
+              username: discordUser.username,
+            },
+          },
+        });
+
+        if (signUpError) throw signUpError;
+
+        // Ora fai il login
+        signInResult = await supabase.auth.signInWithPassword({ email, password });
+        if (signInResult.error) throw signInResult.error;
+      }
+
       setStatus('success');
       setMessage('Authentication successful!');
-
+      
       setTimeout(() => {
         router.push('/dashboard');
-      }, 1500);
+      }, 1000);
     } catch (error: any) {
       setStatus('error');
       setMessage(error.message || 'Authentication failed');
