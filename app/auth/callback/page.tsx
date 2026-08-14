@@ -42,14 +42,17 @@ export default function AuthCallback() {
       const email = `${discordUser.id}@discord.local`;
       const password = discordUser.id + '-hrk-cqb-2026';
 
+      let supabaseUser: any = null;
+
       // Prova login
-      let { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
       });
 
-      if (!authError && authData.user) {
-        // Utente esiste, aggiorna metadati
+      if (!signInError && signInData.user) {
+        supabaseUser = signInData.user;
+        // Aggiorna metadati
         await supabase.auth.updateUser({
           data: {
             discord_id: discordUser.id,
@@ -59,7 +62,7 @@ export default function AuthCallback() {
       } else {
         // Crea nuovo utente
         console.log('Creating new user...');
-        const signUpResult = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -70,11 +73,10 @@ export default function AuthCallback() {
           },
         });
 
-        if (signUpResult.error) throw signUpResult.error;
-        authData = signUpResult.data;
+        if (signUpError) throw signUpError;
+        supabaseUser = signUpData.user;
       }
 
-      const supabaseUser = authData?.user;
       if (!supabaseUser) throw new Error('Authentication failed - no user');
 
       // Sync con tabella users (upsert per discord_id)
