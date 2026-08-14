@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-military-900 text-military-100;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  ::selection {
+    @apply bg-accent-gold/30 text-white;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-military-800/80 backdrop-blur-md border border-military-600/50 rounded-lg;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-accent-green hover:bg-accent-green/80 text-white font-semibold rounded-lg transition-all duration-200 border border-accent-green/50;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-military-700 hover:bg-military-600 text-military-100 font-semibold rounded-lg transition-all duration-200 border border-military-600;
+  }
+
+  .btn-danger {
+    @apply px-6 py-3 bg-accent-red hover:bg-accent-red/80 text-white font-semibold rounded-lg transition-all duration-200 border border-accent-red/50;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-military-800 border border-military-600 rounded-lg text-military-100 placeholder-military-400 focus:outline-none focus:border-accent-gold focus:ring-1 focus:ring-accent-gold/50 transition-all;
+  }
+
+  .slide-container {
+    @apply relative overflow-hidden rounded-lg border border-military-600/50 bg-military-800;
+  }
+
+  .watermark-text {
+    @apply absolute pointer-events-none select-none text-military-500/20 font-mono text-xs tracking-widest;
+  }
+}
+
+@layer utilities {
+  .no-select {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .blur-content {
+    filter: blur(12px);
+    pointer-events: none;
+  }
+}
