@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { supabase, getCurrentUser, getSessionByCode, getSlides, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote, getQuizQuestions } from '@/lib/supabase';
-import { User, Session, Slide, Note, QuizQuestion } from '@/types';
+import { supabase, getCurrentUser, getSessionByCode, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote, getQuizQuestions } from '@/lib/supabase';
+import { User, Session, Note, QuizQuestion } from '@/types';
 import { subscribeToSession } from '@/lib/supabase';
-import { Shield, LogOut, Users, Play, Square, ChevronLeft, ChevronRight, FileText, MessageSquare, HelpCircle, AlertTriangle } from 'lucide-react';
+import { SLIDE_SET } from '@/app/slides';
+import { Shield, LogOut, Users, Play, Square, ChevronLeft, ChevronRight, FileText, MessageSquare, HelpCircle, AlertTriangle, Clock } from 'lucide-react';
 
 export default function SessionRoom() {
   const params = useParams();
@@ -14,7 +15,6 @@ export default function SessionRoom() {
 
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
@@ -24,6 +24,9 @@ export default function SessionRoom() {
   const [isBlurred, setIsBlurred] = useState(false);
   const [watermarkPos, setWatermarkPos] = useState({ x: 20, y: 20 });
   const [isLoading, setIsLoading] = useState(true);
+
+  const totalSlides = SLIDE_SET.length;
+  const ActiveSlideComponent = SLIDE_SET[currentSlide]?.component;
 
   // Anti-screenshot: blur on focus loss
   useEffect(() => {
@@ -102,10 +105,6 @@ export default function SessionRoom() {
       await joinSession(sessionData.id, currentUser.id);
     }
 
-    // Load slides
-    const slidesData = await getSlides(sessionData.id);
-    setSlides(slidesData);
-
     // Load notes
     const noteData = await getNote(currentUser.id, sessionData.id);
     if (noteData) setNotes(noteData.content);
@@ -132,11 +131,11 @@ export default function SessionRoom() {
   }, [session, currentSlide]);
 
   const handleNextSlide = useCallback(async () => {
-    if (!session || currentSlide >= slides.length - 1) return;
+    if (!session || currentSlide >= totalSlides - 1) return;
     const newIndex = currentSlide + 1;
     await updateCurrentSlide(session.id, newIndex);
     setCurrentSlide(newIndex);
-  }, [session, currentSlide, slides.length]);
+  }, [session, currentSlide, totalSlides]);
 
   const handleStartSession = async () => {
     if (!session) return;
@@ -171,8 +170,6 @@ export default function SessionRoom() {
       </div>
     );
   }
-
-  const activeSlide = slides[currentSlide];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -215,14 +212,14 @@ export default function SessionRoom() {
           {/* Slide Viewer */}
           <div className="flex-1 p-4 overflow-auto">
             <div 
-              className={`slide-container max-w-4xl mx-auto min-h-[500px] p-8 relative transition-all duration-300 ${
+              className={`slide-container max-w-5xl mx-auto h-[600px] p-6 relative transition-all duration-300 ${
                 isBlurred ? 'blur-content' : ''
               }`}
               onContextMenu={(e) => e.preventDefault()}
             >
               {/* Dynamic Watermark */}
               <div 
-                className="watermark-text"
+                className="watermark-text z-10"
                 style={{ 
                   left: `${watermarkPos.x}%`, 
                   top: `${watermarkPos.y}%`,
@@ -232,7 +229,7 @@ export default function SessionRoom() {
                 {user?.username} • {new Date().toISOString()} • {session?.code}
               </div>
               <div 
-                className="watermark-text"
+                className="watermark-text z-10"
                 style={{ 
                   left: `${100 - watermarkPos.x - 20}%`, 
                   top: `${100 - watermarkPos.y - 10}%`,
@@ -251,34 +248,36 @@ export default function SessionRoom() {
                   <h2 className="text-2xl font-bold text-white">Waiting for Instructor</h2>
                   <p className="text-military-400">The session will begin shortly. Please wait.</p>
                 </div>
-              ) : activeSlide ? (
-                <div className="space-y-6 no-select">
-                  <h2 className="text-3xl font-bold text-white border-b border-military-700 pb-4">
-                    {activeSlide.title}
-                  </h2>
-                  <div className="prose prose-invert max-w-none">
-                    <div className="text-military-200 leading-relaxed whitespace-pre-wrap">
-                      {activeSlide.content}
+              ) : ActiveSlideComponent ? (
+                <div className="h-full no-select">
+                  <div className="flex items-center justify-between mb-4 border-b border-military-700/50 pb-3">
+                    <div>
+                      <span className="text-accent-gold font-mono text-sm">SLIDE {currentSlide + 1} / {totalSlides}</span>
+                      <h3 className="text-xl font-bold text-white mt-1">{SLIDE_SET[currentSlide].title}</h3>
                     </div>
+                    {SLIDE_SET[currentSlide].duration && (
+                      <div className="flex items-center gap-1 text-military-500 text-xs font-mono">
+                        <Clock className="w-3 h-3" />
+                        ~{SLIDE_SET[currentSlide].duration}s
+                      </div>
+                    )}
+                  </div>
+                  <div className="h-[calc(100%-60px)]">
+                    <ActiveSlideComponent />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-military-500">
-                  No slides available
+                  No slide available
                 </div>
               )}
-
-              {/* Slide Counter */}
-              <div className="absolute bottom-4 right-4 text-xs text-military-500 font-mono">
-                {currentSlide + 1} / {slides.length}
-              </div>
             </div>
           </div>
 
           {/* Instructor Controls */}
           {isInstructor && (
             <div className="border-t border-military-700/50 bg-military-800/50 p-4">
-              <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <div className="max-w-5xl mx-auto flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {session?.status === 'waiting' && (
                     <button onClick={handleStartSession} className="btn-primary flex items-center gap-2">
@@ -296,11 +295,11 @@ export default function SessionRoom() {
                         <ChevronLeft className="w-4 h-4" />
                       </button>
                       <span className="text-sm text-military-300 font-mono px-4">
-                        {currentSlide + 1} / {slides.length}
+                        {currentSlide + 1} / {totalSlides}
                       </span>
                       <button 
                         onClick={handleNextSlide}
-                        disabled={currentSlide >= slides.length - 1}
+                        disabled={currentSlide >= totalSlides - 1}
                         className="btn-secondary disabled:opacity-50"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -325,9 +324,9 @@ export default function SessionRoom() {
           {/* Attendee Navigation (only when quiz not active) */}
           {!isInstructor && session?.status === 'active' && (
             <div className="border-t border-military-700/50 bg-military-800/50 p-4">
-              <div className="max-w-4xl mx-auto flex items-center justify-center gap-4">
+              <div className="max-w-5xl mx-auto flex items-center justify-center gap-4">
                 <span className="text-sm text-military-400 font-mono">
-                  Slide {currentSlide + 1} of {slides.length}
+                  Slide {currentSlide + 1} of {totalSlides}
                 </span>
               </div>
             </div>
@@ -376,8 +375,25 @@ export default function SessionRoom() {
                   <div className="space-y-2 text-xs text-military-300">
                     <p><span className="text-military-500">Instructor:</span> {isInstructor ? 'You' : 'Instructor'}</p>
                     <p><span className="text-military-500">Status:</span> {session?.status}</p>
-                    <p><span className="text-military-500">Slides:</span> {slides.length}</p>
+                    <p><span className="text-military-500">Slides:</span> {totalSlides}</p>
                     <p><span className="text-military-500">Attendees:</span> {attendees}</p>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-4">
+                  <h3 className="text-sm font-semibold text-white mb-2">Slide Overview</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {SLIDE_SET.map((slide, idx) => (
+                      <div 
+                        key={slide.id}
+                        className={`flex items-center gap-2 p-2 rounded text-xs ${
+                          idx === currentSlide ? 'bg-accent-gold/20 text-accent-gold' : 'text-military-400'
+                        }`}
+                      >
+                        <span className="font-mono w-6">{slide.id}</span>
+                        <span className="truncate">{slide.title}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -462,7 +478,7 @@ function QuizPanel({ questions, sessionId, userId, isActive }: {
       const answer = answers[question.id] || '';
       const isCorrect = question.type === 'multiple_choice' 
         ? answer === question.correct_answer
-        : answer.length > 20; // Simple validation for scenario questions
+        : answer.length > 20;
 
       const points = isCorrect ? 1 : 0;
       totalScore += points;
