@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { supabase, getCurrentUser, getSessionByCode, getSlides, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote, getQuizQuestions } from '@/lib/supabase';
-import { User, Session, Note, QuizQuestion } from '@/types';
+import { supabase, getCurrentUser, getSessionByCode, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote } from '@/lib/supabase';
+import { User, Session, Note } from '@/types';
 import { subscribeToSession } from '@/lib/supabase';
 import { SLIDE_SET } from '@/app/slides';
-import { Shield, LogOut, Users, Play, Square, ChevronLeft, ChevronRight, FileText, MessageSquare, HelpCircle, AlertTriangle, Clock } from 'lucide-react';
+import { QUIZ_SET, TOTAL_QUIZ_QUESTIONS } from '@/app/quiz';
+import { Shield, LogOut, Users, Play, Square, ChevronLeft, ChevronRight, FileText, MessageSquare, HelpCircle, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 export default function SessionRoom() {
   const params = useParams();
@@ -19,7 +20,6 @@ export default function SessionRoom() {
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [attendees, setAttendees] = useState(0);
   const [isBlurred, setIsBlurred] = useState(false);
   const [watermarkPos, setWatermarkPos] = useState({ x: 20, y: 20 });
@@ -108,10 +108,6 @@ export default function SessionRoom() {
     // Load notes
     const noteData = await getNote(currentUser.id, sessionData.id);
     if (noteData) setNotes(noteData.content);
-
-    // Load quiz questions
-    const questions = await getQuizQuestions(sessionData.id);
-    setQuizQuestions(questions);
 
     // Count attendees
     const { count } = await supabase
@@ -209,7 +205,7 @@ export default function SessionRoom() {
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Slide Viewer — ADATTABILE E SCORREVOLE */}
+          {/* Slide Viewer */}
           <div className="flex-1 p-4 overflow-auto">
             <div 
               className={`slide-container max-w-5xl mx-auto min-h-[300px] p-6 relative transition-all duration-300 ${
@@ -443,7 +439,6 @@ export default function SessionRoom() {
 
             {showQuiz && (
               <QuizPanel 
-                questions={quizQuestions}
                 sessionId={session?.id || ''}
                 userId={user?.id || ''}
                 isActive={session?.status === 'quiz'}
@@ -457,8 +452,7 @@ export default function SessionRoom() {
 }
 
 // Quiz Panel Component
-function QuizPanel({ questions, sessionId, userId, isActive }: {
-  questions: QuizQuestion[];
+function QuizPanel({ sessionId, userId, isActive }: {
   sessionId: string;
   userId: string;
   isActive: boolean;
@@ -466,19 +460,21 @@ function QuizPanel({ questions, sessionId, userId, isActive }: {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
 
   const handleSubmit = async () => {
+    setSaving(true);
     let totalScore = 0;
 
-    for (const question of questions) {
+    for (const question of QUIZ_SET) {
       const answer = answers[question.id] || '';
       const isCorrect = question.type === 'multiple_choice' 
         ? answer === question.correct_answer
-        : answer.length > 20;
+        : answer.trim().length >= 30;
 
       const points = isCorrect ? 1 : 0;
       totalScore += points;
@@ -494,38 +490,77 @@ function QuizPanel({ questions, sessionId, userId, isActive }: {
 
     setScore(totalScore);
     setSubmitted(true);
+    setSaving(false);
   };
+
+  const mcqCorrect = QUIZ_SET.filter(q => q.type === 'multiple_choice' && answers[q.id] === q.correct_answer).length;
+  const mcqTotal = QUIZ_SET.filter(q => q.type === 'multiple_choice').length;
+  const scenarioAnswered = QUIZ_SET.filter(q => q.type === 'scenario' && (answers[q.id] || '').trim().length >= 30).length;
+  const scenarioTotal = QUIZ_SET.filter(q => q.type === 'scenario').length;
 
   if (!isActive && !submitted) {
     return (
       <div className="text-center py-8 space-y-4">
         <HelpCircle className="w-12 h-12 text-military-600 mx-auto" />
         <p className="text-military-400 text-sm">Quiz not yet active. Wait for the instructor to unlock it.</p>
+        <div className="glass-panel p-3 text-xs text-military-500">
+          <p>{TOTAL_QUIZ_QUESTIONS} questions total</p>
+          <p>{mcqTotal} multiple choice &bull; {scenarioTotal} scenario-based</p>
+        </div>
       </div>
     );
   }
 
   if (submitted) {
+    const percentage = Math.round((score / TOTAL_QUIZ_QUESTIONS) * 100);
+    const passed = percentage >= 80;
+
     return (
       <div className="text-center py-8 space-y-4">
-        <div className="w-16 h-16 bg-accent-green/20 rounded-full flex items-center justify-center mx-auto">
-          <Shield className="w-8 h-8 text-accent-green" />
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${passed ? 'bg-accent-green/20' : 'bg-accent-red/20'}`}>
+          {passed ? <CheckCircle className="w-8 h-8 text-accent-green" /> : <XCircle className="w-8 h-8 text-accent-red" />}
         </div>
-        <h3 className="text-lg font-bold text-white">Quiz Submitted</h3>
-        <p className="text-military-300">
-          Score: <span className="text-accent-gold font-bold">{score}</span> / {questions.length}
-        </p>
+        <h3 className="text-lg font-bold text-white">
+          {passed ? 'ASSESSMENT PASSED' : 'ASSESSMENT FAILED'}
+        </h3>
+        <div className="space-y-1">
+          <p className="text-military-300">
+            Score: <span className={`font-bold ${passed ? 'text-accent-green' : 'text-accent-red'}`}>{score}</span> / {TOTAL_QUIZ_QUESTIONS}
+          </p>
+          <p className="text-military-400 text-xs">{percentage}% — Minimum 80% required</p>
+        </div>
+        <div className="glass-panel p-3 text-xs text-left space-y-1">
+          <p className="text-military-400">MCQ: {mcqCorrect}/{mcqTotal} correct</p>
+          <p className="text-military-400">Scenarios: {scenarioAnswered}/{scenarioTotal} answered</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {questions.map((question, index) => (
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-military-400 font-mono">
+          {Object.keys(answers).length} / {TOTAL_QUIZ_QUESTIONS} answered
+        </p>
+        <div className="w-24 h-1.5 bg-military-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-accent-gold transition-all duration-300"
+            style={{ width: `${(Object.keys(answers).length / TOTAL_QUIZ_QUESTIONS) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {QUIZ_SET.map((question, index) => (
         <div key={question.id} className="glass-panel p-4 space-y-3">
           <div className="flex items-start gap-2">
-            <span className="text-accent-gold font-mono text-sm">Q{index + 1}</span>
-            <p className="text-sm text-white font-medium">{question.question}</p>
+            <span className="text-accent-gold font-mono text-sm shrink-0">Q{index + 1}</span>
+            <div>
+              <p className="text-sm text-white font-medium">{question.question}</p>
+              {question.type === 'scenario' && (
+                <span className="inline-block mt-1 px-2 py-0.5 bg-accent-red/10 border border-accent-red/30 rounded text-accent-red text-[10px] font-mono">SCENARIO</span>
+              )}
+            </div>
           </div>
 
           {question.scenario_context && (
@@ -563,8 +598,8 @@ function QuizPanel({ questions, sessionId, userId, isActive }: {
             <textarea
               value={answers[question.id] || ''}
               onChange={(e) => handleAnswer(question.id, e.target.value)}
-              placeholder="Describe your tactical response..."
-              className="w-full h-24 bg-military-800 border border-military-600 rounded-lg p-3 text-sm text-military-100 placeholder-military-500 resize-none focus:outline-none focus:border-accent-gold"
+              placeholder="Describe your tactical response... (min. 30 characters)"
+              className="w-full h-28 bg-military-800 border border-military-600 rounded-lg p-3 text-sm text-military-100 placeholder-military-500 resize-none focus:outline-none focus:border-accent-gold"
             />
           )}
         </div>
@@ -572,11 +607,24 @@ function QuizPanel({ questions, sessionId, userId, isActive }: {
 
       <button 
         onClick={handleSubmit}
-        className="btn-primary w-full"
-        disabled={Object.keys(answers).length < questions.length}
+        className="btn-primary w-full flex items-center justify-center gap-2"
+        disabled={Object.keys(answers).length < TOTAL_QUIZ_QUESTIONS || saving}
       >
-        Submit Quiz
+        {saving ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Submitting...
+          </>
+        ) : (
+          <>Submit Quiz</>
+        )}
       </button>
+
+      {Object.keys(answers).length < TOTAL_QUIZ_QUESTIONS && (
+        <p className="text-xs text-military-500 text-center">
+          Answer all {TOTAL_QUIZ_QUESTIONS} questions to submit
+        </p>
+      )}
     </div>
   );
 }
