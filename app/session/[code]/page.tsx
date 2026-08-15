@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { supabase, getCurrentUser, getSessionByCode, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote, getQuizQuestions } from '@/lib/supabase';
+import { supabase, getCurrentUser, getSessionByCode, getSlides, joinSession, updateSessionStatus, updateCurrentSlide, saveNote, getNote, getQuizQuestions } from '@/lib/supabase';
 import { User, Session, Note, QuizQuestion } from '@/types';
 import { subscribeToSession } from '@/lib/supabase';
 import { SLIDE_SET } from '@/app/slides';
@@ -208,11 +208,11 @@ export default function SessionRoom() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          {/* Slide Viewer */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Slide Viewer — ADATTABILE E SCORREVOLE */}
           <div className="flex-1 p-4 overflow-auto">
             <div 
-              className={`slide-container max-w-5xl mx-auto h-[600px] p-6 relative transition-all duration-300 ${
+              className={`slide-container max-w-5xl mx-auto min-h-[300px] p-6 relative transition-all duration-300 ${
                 isBlurred ? 'blur-content' : ''
               }`}
               onContextMenu={(e) => e.preventDefault()}
@@ -226,7 +226,7 @@ export default function SessionRoom() {
                   transform: 'rotate(-15deg)',
                 }}
               >
-                {user?.username} • {new Date().toISOString()} • {session?.code}
+                {user?.username} &bull; {new Date().toISOString()} &bull; {session?.code}
               </div>
               <div 
                 className="watermark-text z-10"
@@ -236,12 +236,12 @@ export default function SessionRoom() {
                   transform: 'rotate(15deg)',
                 }}
               >
-                CONFIDENTIAL • HERRICK TF • {user?.username}
+                CONFIDENTIAL &bull; HERRICK TF &bull; {user?.username}
               </div>
 
               {/* Slide Content */}
               {session?.status === 'waiting' && !isInstructor ? (
-                <div className="flex flex-col items-center justify-center h-full space-y-4 text-center">
+                <div className="flex flex-col items-center justify-center h-full space-y-4 text-center min-h-[300px]">
                   <div className="w-16 h-16 bg-accent-gold/20 rounded-full flex items-center justify-center animate-pulse">
                     <AlertTriangle className="w-8 h-8 text-accent-gold" />
                   </div>
@@ -249,7 +249,7 @@ export default function SessionRoom() {
                   <p className="text-military-400">The session will begin shortly. Please wait.</p>
                 </div>
               ) : ActiveSlideComponent ? (
-                <div className="h-full no-select">
+                <div className="no-select">
                   <div className="flex items-center justify-between mb-4 border-b border-military-700/50 pb-3">
                     <div>
                       <span className="text-accent-gold font-mono text-sm">SLIDE {currentSlide + 1} / {totalSlides}</span>
@@ -262,12 +262,12 @@ export default function SessionRoom() {
                       </div>
                     )}
                   </div>
-                  <div className="h-[calc(100%-60px)]">
+                  <div className="overflow-y-auto max-h-[calc(100vh-280px)]">
                     <ActiveSlideComponent />
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-military-500">
+                <div className="flex items-center justify-center h-full text-military-500 min-h-[300px]">
                   No slide available
                 </div>
               )}
@@ -321,7 +321,7 @@ export default function SessionRoom() {
             </div>
           )}
 
-          {/* Attendee Navigation (only when quiz not active) */}
+          {/* Attendee Navigation */}
           {!isInstructor && session?.status === 'active' && (
             <div className="border-t border-military-700/50 bg-military-800/50 p-4">
               <div className="max-w-5xl mx-auto flex items-center justify-center gap-4">
@@ -334,7 +334,7 @@ export default function SessionRoom() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 border-l border-military-700/50 bg-military-800/30 flex flex-col">
+        <div className="w-80 border-l border-military-700/50 bg-military-800/30 flex flex-col shrink-0">
           {/* Tabs */}
           <div className="flex border-b border-military-700/50">
             <button 
